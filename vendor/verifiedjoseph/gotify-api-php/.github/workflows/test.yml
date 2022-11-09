@@ -1,0 +1,67 @@
+name: Tests
+on:
+  pull_request:
+    paths:
+      - "src/**.php"
+      - "tests/**.php"
+      - ".github/workflows/test.yml"
+      - ".ci/docker-compose.yml"
+  push:
+    branches: main
+    paths:
+      - "src/**.php"
+      - "tests/**.php"
+      - ".github/workflows/test.yml"
+      - ".ci/docker-compose.yml"
+
+jobs:
+  test:
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        php-version: ['8.0', '8.1']
+        operating-system: [ubuntu-latest]
+    
+    name: PHPUnit (php${{ matrix.php-version }})
+
+    env:
+      COMPOSE_FILE: .ci/docker-compose.yml
+      GOTIFY_URI: "http://127.0.0.1:8080"
+      HTTPBIN_URI: "http://127.0.0.1:8081"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3.1.0
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: mbstring
+    
+    - name: Setup problem matchers for PHP
+      run: echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+
+    - name: Setup problem matchers for PHPUnit
+      run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
+    - name: "Validate composer.json and composer.lock"
+      run: "composer validate --strict"
+
+    - name: Install dependencies with composer
+      run: composer install --prefer-dist
+
+    #- name: Fetch & setup gotify plugin
+    #  run: bash .ci/setup-plugin.sh
+
+    - name: Start gotify & httpbin docker containers
+      run: docker-compose up -d
+
+    - name: Test connections to docker containers
+      run: bash .ci/connections.sh
+
+    - name: Run phpunit
+      run: ./vendor/bin/phpunit
+
+    - name: Stop gotify & httpbin docker docker containers
+      run: docker-compose down
