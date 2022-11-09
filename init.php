@@ -4,7 +4,7 @@ require_once __DIR__ . "/vendor/autoload.php";
 use Gotify\Exception\GotifyException;
 use Gotify\Exception\EndpointException;
 
-class Gotify_Notifications extends Plugin {
+class gotify_notifications extends Plugin {
 
 	/* @var PluginHost $host */
 	private $host;
