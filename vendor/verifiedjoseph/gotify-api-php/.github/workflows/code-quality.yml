@@ -22,14 +22,14 @@ jobs:
       fail-fast: false
       matrix:
         php-version: ['8.0', '8.1']
-        operating-system: [ubuntu-latest]
+        operating-system: [ubuntu-22.04]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.1.0
+        uses: actions/checkout@v3.2.0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.23.0
         with:
           php-version: ${{ matrix.php-version }}
 
@@ -50,14 +50,14 @@ jobs:
       fail-fast: false
       matrix:
         php-version: ['8.0', '8.1']
-        operating-system: [ubuntu-latest]
+        operating-system: [ubuntu-22.04]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.1.0
+        uses: actions/checkout@v3.2.0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.23.0
         with:
           php-version: ${{ matrix.php-version }}
           tools: cs2pr
@@ -76,14 +76,14 @@ jobs:
       fail-fast: false
       matrix:
         php-version: ['8.0', '8.1']
-        operating-system: [ubuntu-latest]
+        operating-system: [ubuntu-22.04]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.1.0
+        uses: actions/checkout@v3.2.0
 
       - name: Setup PHP environment
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.23.0
         with:
           php-version: ${{ matrix.php-version }}
 
@@ -92,3 +92,22 @@ jobs:
 
       - name: Run phpmd
         run: ./vendor/bin/phpmd . github phpmd.ruleset.xml --exclude 'vendor/*'
+
+  php-cs-fixer:
+    name: php-cs-fixer (php8.0)
+
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.2.0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2.23.0
+        with:
+          php-version: '8.0'
+
+      - name: Install dependencies with composer
+        run: composer install --prefer-dist
+
+      - name: Run php-cs-fixer
+        run:  ./vendor/bin/php-cs-fixer fix --dry-run

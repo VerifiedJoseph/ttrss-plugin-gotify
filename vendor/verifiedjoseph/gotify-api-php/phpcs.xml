@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ruleset name="gotify-api-php Ruleset">
-  <description>Created with the PHP Coding Standard Generator. http://edorian.github.com/php-coding-standard-generator/</description>
   <exclude-pattern>./cache</exclude-pattern>
   <exclude-pattern>./vendor</exclude-pattern>
   <!-- Duplicate class names are not allowed -->
@@ -41,8 +40,6 @@
   <rule ref="Generic.PHP.LowerCaseConstant"/>
   <!-- Use a single string instead of concating -->
   <rule ref="Generic.Strings.UnnecessaryStringConcat"/>
-  <!-- Use tabs for indentation -->
-  <rule ref="Generic.WhiteSpace.DisallowSpaceIndent"/>
   <!-- Parameters with default values must appear last in functions -->
   <rule ref="PEAR.Functions.ValidDefaultValue"/>
   <!-- Use PascalCase for class names -->
