@@ -118,16 +118,28 @@ class gotify_notifications extends Plugin {
 	function hook_prefs_edit_feed($feed_id)
 	{
 		$enabled_feeds = $this->get_stored_array('enabled_feeds');
+		$app_tokens = $this->get_stored_array('app_tokens');
+
+		$token = '';
+		if (array_key_exists($feed_id, $app_tokens) === true) {
+			$token = $app_tokens[$feed_id];
+		}
+
 		$checkboxTag = \Controls\checkbox_tag('gotify_enabled', in_array($feed_id, $enabled_feeds));
+		$tokenInputTag =  \Controls\input_tag(
+			'gotify_token', htmlspecialchars($token), 'text', array('dojoType' => 'dijit.form.ValidationTextBox')
+		);
 
 		print <<<HTML
-			<header>Gotify</header>
+			<header>Gotify Notifications</header>
 			<section>
 				<fieldset>
-					<label class="checkbox">
-						{$checkboxTag}
-						Enable
-					</label>
+				<label>Enable:</label>
+					{$checkboxTag}
+				</fieldset>
+				<fieldset>
+				<label>App token:</label>
+					{$tokenInputTag} <span title="Overrides app token given in plugin settings.">[?]</span>
 				</fieldset>
 			</section>
 		HTML;
@@ -136,9 +148,12 @@ class gotify_notifications extends Plugin {
 	function hook_prefs_save_feed($feed_id)
 	{
 		$enabled_feeds = $this->get_stored_array('enabled_feeds');
+		$app_tokens = $this->get_stored_array('app_tokens');
+
 		$enable_key = array_search($feed_id, $enabled_feeds);
 
 		$enable = checkbox_to_sql_bool($_POST['gotify_enabled'] ?? '');
+		$token = $_POST['gotify_token'] ?? '';
 
 		if ($enable) {
 			if ($enable_key === false) {
@@ -151,6 +166,14 @@ class gotify_notifications extends Plugin {
 		}
 
 		$this->host->set($this, 'enabled_feeds', $enabled_feeds);
+
+		if ($token !== '') {
+			$app_tokens[$feed_id] = $token;
+		} else if ($token === '' && array_key_exists($feed_id, $app_tokens)) {
+			unset($app_tokens[$feed_id]);
+		}
+
+		$this->host->set($this, 'app_tokens', $app_tokens);
 	}
 
 	private function get_stored_array($name)
@@ -165,14 +188,22 @@ class gotify_notifications extends Plugin {
 	function hook_article_filter($article)
 	{
 		$enabled_feeds = $this->get_stored_array('enabled_feeds');
+		$app_tokens = $this->get_stored_array('app_tokens');
+
 		$feed_id = $article['feed']['id'];
+
+		$token = $this->host->get($this, 'app_token');
+		if (array_key_exists($feed_id, $app_tokens) === true) {
+			$token = $app_tokens[$feed_id];
+		}
 
 		if (in_array($feed_id, $enabled_feeds)) {
 			if ($this->isNewArticle($article['guid_hashed']) === true) {
 				$this->sendMessage(
 					Feeds::_get_title($feed_id),
 					$article['title'],
-					$article['link']
+					$article['link'],
+					$token
 				);
 			} else {
 				Debug::log('[Gotify] Article is not new. Not sending message.', Debug::LOG_VERBOSE);
@@ -198,10 +229,9 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-	private function sendMessage($feedName, $title, $url)
+	private function sendMessage($feedName, $title, $url, $token)
 	{
 		$serverUri = $this->host->get($this, 'server');
-		$token = $this->host->get($this, 'app_token');
 		$priority = (int) $this->host->get($this, 'priority');
 
 		Debug::log('[Gotify] Sending message via ' . $serverUri, Debug::LOG_VERBOSE);
@@ -211,7 +241,7 @@ class gotify_notifications extends Plugin {
 			$auth = new Gotify\Auth\Token($token);
 			$message = new Gotify\Endpoint\Message($server, $auth);
 		
-			$messageTitle = '[tt-rss] ' . $feedName;
+			$messageTitle = $feedName;
 			$messageBody = $title;
 			$messageExtras = array(
 				'client::notification' => array(
