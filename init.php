@@ -33,7 +33,6 @@ class gotify_notifications extends Plugin {
 	{
 		$this->host = $host;
 		$host->add_hook($host::HOOK_FILTER_TRIGGERED, $this);
-		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
 		$host->add_hook($host::HOOK_PREFS_TAB, $this);
 		$host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
 		$host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
@@ -140,7 +139,7 @@ class gotify_notifications extends Plugin {
 				</fieldset>
 				<fieldset>
 				<label>App token:</label>
-					{$tokenInputTag} <span title="Overrides app token given in plugin settings.">[?]</span>
+					{$tokenInputTag} <span title="Set app token specifically for this feed.">[?]</span>
 				</fieldset>
 			</section>
 		HTML;
@@ -224,34 +223,6 @@ class gotify_notifications extends Plugin {
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
 		}
-	}
-
-	function hook_article_filter($article)
-	{
-		/*$enabled_feeds = $this->get_stored_array('enabled_feeds');
-		$app_tokens = $this->get_stored_array('app_tokens');
-
-		$feed_id = $article['feed']['id'];
-
-		$token = $this->host->get($this, 'app_token');
-		if (array_key_exists($feed_id, $app_tokens) === true) {
-			$token = $app_tokens[$feed_id];
-		}
-
-		if (in_array($feed_id, $enabled_feeds)) {
-			if ($this->isNewArticle($article['guid_hashed']) === true) {
-				$this->sendMessage(
-					Feeds::_get_title($feed_id),
-					$article['title'],
-					$article['link'],
-					$token
-				);
-			} else {
-				Debug::log('[Gotify] Article is not new. Not sending message.', Debug::LOG_VERBOSE);
-			}
-		}*/
-
-		return $article;
 	}
 
 	private function filter_unknown_feeds($enabled_feeds)
