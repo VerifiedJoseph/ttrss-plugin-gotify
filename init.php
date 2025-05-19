@@ -32,6 +32,7 @@ class gotify_notifications extends Plugin {
 	function init($host)
 	{
 		$this->host = $host;
+		$host->add_hook($host::HOOK_FILTER_TRIGGERED, $this);
 		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
 		$host->add_hook($host::HOOK_PREFS_TAB, $this);
 		$host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
@@ -185,9 +186,49 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-	function hook_article_filter($article)
+	function hook_filter_triggered($feed_id, $owner_uid, $article, $matched_filters, $matched_rules, $article_filters)
 	{
 		$enabled_feeds = $this->get_stored_array('enabled_feeds');
+		$app_tokens = $this->get_stored_array('app_tokens');
+		$feed_id = $article['feed']['id'];
+
+		$token = $this->host->get($this, 'app_token');
+		if (array_key_exists($feed_id, $app_tokens) === true) {
+			Debug::log('[Gotify] Using feed specific app token');
+			$token = $app_tokens[$feed_id];
+		}
+
+		try {
+			if (in_array($feed_id, $enabled_feeds) === false) {
+				throw new Exception('Gotify not enabled for this feed.');
+			}
+
+			if (RSSUtils::find_article_filter($article_filters, 'filter') !== null) {
+				throw new Exception('Article deleted via filter. Not sending message.');
+			}
+
+			if (RSSUtils::find_article_filter($article_filters, 'catchup') !== null) {
+				throw new Exception('Article mark as read via filter. Not sending message.');
+			}
+
+			if ($this->isNewArticle($article['guid_hashed']) === false) {
+				throw new Exception('Article is not new. Not sending message');
+			}
+
+			$this->sendMessage(
+				Feeds::_get_title($feed_id),
+				$article['title'],
+				$article['link'],
+				$token
+			);
+		} catch (Exception $err) {
+			Debug::log('[Gotify] ' . $err->getMessage());
+		}
+	}
+
+	function hook_article_filter($article)
+	{
+		/*$enabled_feeds = $this->get_stored_array('enabled_feeds');
 		$app_tokens = $this->get_stored_array('app_tokens');
 
 		$feed_id = $article['feed']['id'];
@@ -208,7 +249,7 @@ class gotify_notifications extends Plugin {
 			} else {
 				Debug::log('[Gotify] Article is not new. Not sending message.', Debug::LOG_VERBOSE);
 			}
-		}
+		}*/
 
 		return $article;
 	}
