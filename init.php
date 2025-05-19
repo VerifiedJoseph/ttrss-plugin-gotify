@@ -10,7 +10,8 @@ class gotify_notifications extends Plugin {
 	private $host;
 
 	function about() {
-		return array(null,
+		return array(
+			'1.1',
 			'Send push notifications with Gotify on new feed items',
 			'VerifiedJoseph');
 	}
