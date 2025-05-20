@@ -192,13 +192,24 @@ class gotify_notifications extends Plugin {
 		$app_tokens = $this->get_stored_array('app_tokens');
 		$feed_id = $article['feed']['id'];
 
+		$server = $this->host->get($this, 'server');
 		$token = $this->host->get($this, 'app_token');
+		$priority = (int) $this->host->get($this, 'priority');
+
 		if (array_key_exists($feed_id, $app_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
 			$token = $app_tokens[$feed_id];
 		}
 
 		try {
+			if ($server === false) {
+				throw new Exception('No Gotify server URL set.');
+			}
+
+			if ($token === false) {
+				throw new Exception('No Gotify app token set.');
+			}
+
 			if (in_array($feed_id, $enabled_feeds) === false) {
 				throw new Exception('Gotify not enabled for this feed.');
 			}
@@ -219,7 +230,9 @@ class gotify_notifications extends Plugin {
 				Feeds::_get_title($feed_id),
 				$article['title'],
 				$article['link'],
-				$token
+				$server,
+				$token,
+				$priority
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
@@ -242,17 +255,15 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-	private function sendMessage($feedName, $title, $url, $token)
+	private function sendMessage($feedName, $title, $url, $server, $token, $priority)
 	{
-		$serverUri = $this->host->get($this, 'server');
-		$priority = (int) $this->host->get($this, 'priority');
-
-		Debug::log('[Gotify] Sending message via ' . $serverUri, Debug::LOG_VERBOSE);
+		Debug::log('[Gotify] Sending message via ' . $server, Debug::LOG_VERBOSE);
 
 		try {
-			$server = new Gotify\Server($serverUri);
-			$auth = new Gotify\Auth\Token($token);
-			$message = new Gotify\Endpoint\Message($server, $auth);
+			$message = new Gotify\Endpoint\Message(
+				new Gotify\Server($server),
+				new Gotify\Auth\Token($token)
+			);
 		
 			$messageTitle = $feedName;
 			$messageBody = $title;
