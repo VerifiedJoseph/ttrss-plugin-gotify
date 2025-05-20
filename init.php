@@ -1,13 +1,13 @@
 <?php
-require_once __DIR__ . "/vendor/autoload.php";
 
-use Gotify\Exception\GotifyException;
-use Gotify\Exception\EndpointException;
+require_once __DIR__ . "/include/Request.php";
 
 class gotify_notifications extends Plugin {
 
 	/* @var PluginHost $host */
 	private $host;
+
+	private string $useragent = 'Tiny Tiny RSS Gotify plugin (https://github.com/VerifiedJoseph/ttrss-plugin-gotify)';
 
 	function about() {
 		return array(
@@ -260,28 +260,41 @@ class gotify_notifications extends Plugin {
 		Debug::log('[Gotify] Sending message via ' . $server, Debug::LOG_VERBOSE);
 
 		try {
-			$message = new Gotify\Endpoint\Message(
-				new Gotify\Server($server),
-				new Gotify\Auth\Token($token)
-			);
-		
-			$messageTitle = $feedName;
-			$messageBody = $title;
-			$messageExtras = array(
-				'client::notification' => array(
-					'click' => array('url' => $url)
-				)
+			$server = $this->validateServerUrl($server);
+
+			$headers = [
+				'content-type' => 'application/json; charset=utf-8',
+				'x-gotify-key' => $token
+			];
+
+			$payload = [
+				'title' => $feedName,
+				'message' => $title,
+				'priority' => $priority,
+				'extras' => [
+					'client::notification' => [
+						'click' => ['url' => $url]
+					]
+				]
+			];
+
+			$request = new Request($this->useragent);
+			$response = $request->post(
+				$server . 'message',
+				$payload,
+				$headers
 			);
 
-			$message->create(
-				$messageTitle,
-				$messageBody,
-				$priority,
-				$messageExtras
-			);
+			if ($response['statusCode'] !== 200) {
+				throw new Exception(sprintf(
+					'Sending message failed. Status code: %s Body: %s',
+					$response['statusCode'],
+					$response['body'
+				]));
+			}
 
-			Logger::log(E_USER_NOTICE, 'Gotify: Sent message. ['. $feedName .'] ' . $messageBody);
-		} catch (EndpointException | GotifyException $err) {
+			Logger::log(E_USER_NOTICE, 'Gotify: Sent message.');
+		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
 			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 		}
@@ -322,5 +335,18 @@ class gotify_notifications extends Plugin {
 				{$list}
 			</ul>
 		HTML;
+	}
+
+	private function validateServerUrl(string $server): string
+	{
+		if (preg_match('/^https?:\/\//', $server) === 0) {
+			throw new Exception('Gotify server must start with https:// or http://');
+		}
+
+		if (substr($server, -1) !== '/') {
+			$url .= '/';
+		}
+
+		return $server;
 	}
 }
