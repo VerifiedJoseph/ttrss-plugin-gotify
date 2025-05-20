@@ -1,16 +1,17 @@
 <?php
-require_once __DIR__ . "/vendor/autoload.php";
 
-use Gotify\Exception\GotifyException;
-use Gotify\Exception\EndpointException;
+require_once __DIR__ . "/include/Request.php";
 
 class gotify_notifications extends Plugin {
 
 	/* @var PluginHost $host */
 	private $host;
 
+	private string $useragent = 'Tiny Tiny RSS Gotify plugin (https://github.com/VerifiedJoseph/ttrss-plugin-gotify)';
+
 	function about() {
-		return array(null,
+		return array(
+			'1.1',
 			'Send push notifications with Gotify on new feed items',
 			'VerifiedJoseph');
 	}
@@ -32,7 +33,7 @@ class gotify_notifications extends Plugin {
 	function init($host)
 	{
 		$this->host = $host;
-		$host->add_hook($host::HOOK_ARTICLE_FILTER, $this);
+		$host->add_hook($host::HOOK_FILTER_TRIGGERED, $this);
 		$host->add_hook($host::HOOK_PREFS_TAB, $this);
 		$host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
 		$host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
@@ -139,7 +140,7 @@ class gotify_notifications extends Plugin {
 				</fieldset>
 				<fieldset>
 				<label>App token:</label>
-					{$tokenInputTag} <span title="Overrides app token given in plugin settings.">[?]</span>
+					{$tokenInputTag} <span title="Set app token specifically for this feed.">[?]</span>
 				</fieldset>
 			</section>
 		HTML;
@@ -185,32 +186,57 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-	function hook_article_filter($article)
+	function hook_filter_triggered($feed_id, $owner_uid, $article, $matched_filters, $matched_rules, $article_filters)
 	{
 		$enabled_feeds = $this->get_stored_array('enabled_feeds');
 		$app_tokens = $this->get_stored_array('app_tokens');
-
 		$feed_id = $article['feed']['id'];
 
+		$server = $this->host->get($this, 'server');
 		$token = $this->host->get($this, 'app_token');
+		$priority = (int) $this->host->get($this, 'priority');
+
 		if (array_key_exists($feed_id, $app_tokens) === true) {
+			Debug::log('[Gotify] Using feed specific app token');
 			$token = $app_tokens[$feed_id];
 		}
 
-		if (in_array($feed_id, $enabled_feeds)) {
-			if ($this->isNewArticle($article['guid_hashed']) === true) {
-				$this->sendMessage(
-					Feeds::_get_title($feed_id),
-					$article['title'],
-					$article['link'],
-					$token
-				);
-			} else {
-				Debug::log('[Gotify] Article is not new. Not sending message.', Debug::LOG_VERBOSE);
+		try {
+			if ($server === false) {
+				throw new Exception('No Gotify server URL set.');
 			}
-		}
 
-		return $article;
+			if ($token === false) {
+				throw new Exception('No Gotify app token set.');
+			}
+
+			if (in_array($feed_id, $enabled_feeds) === false) {
+				throw new Exception('Gotify not enabled for this feed.');
+			}
+
+			if (RSSUtils::find_article_filter($article_filters, 'filter') !== null) {
+				throw new Exception('Article deleted via filter. Not sending message.');
+			}
+
+			if (RSSUtils::find_article_filter($article_filters, 'catchup') !== null) {
+				throw new Exception('Article mark as read via filter. Not sending message.');
+			}
+
+			if ($this->isNewArticle($article['guid_hashed']) === false) {
+				throw new Exception('Article is not new. Not sending message');
+			}
+
+			$this->sendMessage(
+				Feeds::_get_title($feed_id),
+				$article['title'],
+				$article['link'],
+				$server,
+				$token,
+				$priority
+			);
+		} catch (Exception $err) {
+			Debug::log('[Gotify] ' . $err->getMessage());
+		}
 	}
 
 	private function filter_unknown_feeds($enabled_feeds)
@@ -229,35 +255,46 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-	private function sendMessage($feedName, $title, $url, $token)
+	private function sendMessage($feedName, $title, $url, $server, $token, $priority)
 	{
-		$serverUri = $this->host->get($this, 'server');
-		$priority = (int) $this->host->get($this, 'priority');
-
-		Debug::log('[Gotify] Sending message via ' . $serverUri, Debug::LOG_VERBOSE);
+		Debug::log('[Gotify] Sending message via ' . $server, Debug::LOG_VERBOSE);
 
 		try {
-			$server = new Gotify\Server($serverUri);
-			$auth = new Gotify\Auth\Token($token);
-			$message = new Gotify\Endpoint\Message($server, $auth);
-		
-			$messageTitle = $feedName;
-			$messageBody = $title;
-			$messageExtras = array(
-				'client::notification' => array(
-					'click' => array('url' => $url)
-				)
+			$server = $this->validateServerUrl($server);
+
+			$headers = [
+				'content-type' => 'application/json; charset=utf-8',
+				'x-gotify-key' => $token
+			];
+
+			$payload = [
+				'title' => $feedName,
+				'message' => $title,
+				'priority' => $priority,
+				'extras' => [
+					'client::notification' => [
+						'click' => ['url' => $url]
+					]
+				]
+			];
+
+			$request = new Request($this->useragent);
+			$response = $request->post(
+				$server . 'message',
+				$payload,
+				$headers
 			);
 
-			$message->create(
-				$messageTitle,
-				$messageBody,
-				$priority,
-				$messageExtras
-			);
+			if ($response['statusCode'] !== 200) {
+				throw new Exception(sprintf(
+					'Sending message failed. Status code: %s Body: %s',
+					$response['statusCode'],
+					$response['body'
+				]));
+			}
 
-			Logger::log(E_USER_NOTICE, 'Gotify: Sent message. ['. $feedName .'] ' . $messageBody);
-		} catch (EndpointException | GotifyException $err) {
+			Logger::log(E_USER_NOTICE, 'Gotify: Sent message.');
+		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
 			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 		}
@@ -298,5 +335,18 @@ class gotify_notifications extends Plugin {
 				{$list}
 			</ul>
 		HTML;
+	}
+
+	private function validateServerUrl(string $server): string
+	{
+		if (preg_match('/^https?:\/\//', $server) === 0) {
+			throw new Exception('Gotify server must start with https:// or http://');
+		}
+
+		if (substr($server, -1) !== '/') {
+			$url .= '/';
+		}
+
+		return $server;
 	}
 }
