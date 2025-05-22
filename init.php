@@ -11,7 +11,7 @@ class gotify_notifications extends Plugin {
 
 	function about() {
 		return array(
-			'1.1',
+			'1.2',
 			'Send push notifications with Gotify on new feed items',
 			'VerifiedJoseph');
 	}
@@ -21,15 +21,6 @@ class gotify_notifications extends Plugin {
 		return 2;
 	}
 
-	function save()
-	{
-		$this->host->set($this, 'server', $_POST['server']);
-		$this->host->set($this, 'app_token', $_POST['app_token']);
-		$this->host->set($this, 'priority', $_POST['priority']);
-
-		echo __('Data saved.');
-	}
-
 	function init($host)
 	{
 		$this->host = $host;
@@ -37,6 +28,16 @@ class gotify_notifications extends Plugin {
 		$host->add_hook($host::HOOK_PREFS_TAB, $this);
 		$host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
 		$host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
+		$host->add_filter_action($this, "Gotify", 'Send Notification');
+	}
+
+	function save()
+	{
+		$this->host->set($this, 'server', $_POST['server']);
+		$this->host->set($this, 'app_token', $_POST['app_token']);
+		$this->host->set($this, 'priority', $_POST['priority']);
+
+		echo __('Data saved.');
 	}
 
 	function hook_prefs_tab($args)
@@ -185,6 +186,43 @@ class gotify_notifications extends Plugin {
 
 		return $tmp;
 	}
+
+    public function hook_article_filter_action($article, $action) {
+		$app_tokens = $this->get_stored_array('app_tokens');
+		$feed_id = $article['feed']['id'];
+
+		$server = $this->host->get($this, 'server');
+		$token = $this->host->get($this, 'app_token');
+		$priority = (int) $this->host->get($this, 'priority');
+
+		if (array_key_exists($feed_id, $app_tokens) === true) {
+			Debug::log('[Gotify] Using feed specific app token');
+			$token = $app_tokens[$feed_id];
+		}
+
+		$feed_id = $article['feed']['id'];
+
+		try {
+			if ($server === false) {
+				throw new Exception('No Gotify server URL set.');
+			}
+
+			if ($token === false) {
+				throw new Exception('No Gotify app token set.');
+			}
+
+			$this->sendMessage(
+				Feeds::_get_title($feed_id),
+				$article['title'],
+				$article['link'],
+				$server,
+				$token,
+				$priority
+			);
+		} catch (Exception $err) {
+			Debug::log('[Gotify] ' . $err->getMessage());
+		}
+    }
 
 	function hook_filter_triggered($feed_id, $owner_uid, $article, $matched_filters, $matched_rules, $article_filters)
 	{
