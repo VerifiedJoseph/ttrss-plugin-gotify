@@ -9,9 +9,13 @@ class gotify_notifications extends Plugin {
 
 	private string $useragent = 'Tiny Tiny RSS Gotify plugin (https://github.com/VerifiedJoseph/ttrss-plugin-gotify)';
 
+	private string $server;
+	private string $token;
+	private string $priority;
+
 	function about() {
 		return array(
-			'1.2',
+			'1.3',
 			'Send push notifications with Gotify on new feed items',
 			'VerifiedJoseph');
 	}
@@ -29,6 +33,10 @@ class gotify_notifications extends Plugin {
 		$host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
 		$host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
 		$host->add_filter_action($this, "Gotify", 'Send Notification');
+
+		$this->server = $this->host->get($this, 'server');
+		$this->token = $this->host->get($this, 'app_token');
+		$this->priority = $this->host->get($this, 'priority');
 	}
 
 	function save()
@@ -44,7 +52,7 @@ class gotify_notifications extends Plugin {
 	{
         $server = $_POST['server'];
         $token = $_POST['app_token'];
-        $priority = (int) $_POST['priority'] ?? 4;
+        $priority = (int) $_POST['priority'];
 
 		try {
 			if ($server === false) {
@@ -76,28 +84,20 @@ class gotify_notifications extends Plugin {
 			return;
 		}
 
-		$server = $this->host->get($this, 'server');
-		$token = $this->host->get($this, 'app_token');
-		$priority = $this->host->get($this, 'priority');
-
-		if ($priority === false) {
-			$priority = 0;
-		}
-
 		$notice = format_notice('Enable for specific feeds in the feed editor.');
 		$pluginHandlerTags = \Controls\pluginhandler_tags($this, 'save');
 
 		$attributes = array('required' => 1, 'dojoType' => 'dijit.form.ValidationTextBox');
 
 		$serverInputTag =  \Controls\input_tag(
-			'server', htmlspecialchars($server), 'text', $attributes
+			'server', htmlspecialchars($this->server), 'text', $attributes
 		);
 
 		$appTokenInputTag = \Controls\input_tag(
-			'app_token', htmlspecialchars($token), 'text', $attributes
+			'app_token', htmlspecialchars($this->token), 'text', $attributes
 		);
 
-		$priorityInputTag = \Controls\number_spinner_tag('priority', $priority, ['required' => 1]);
+		$priorityInputTag = \Controls\number_spinner_tag('priority', $this->priority, ['required' => 1]);
 		$submitTag = \Controls\submit_tag(__('Save'));
 
 		$enabledFeeds = $this->filter_unknown_feeds(
@@ -126,15 +126,15 @@ class gotify_notifications extends Plugin {
 						}
 					</script>
 					<section>
-						<fieldset class="prefs">
+						<fieldset>
 							<label>Server:</label>
 							{$serverInputTag}
 						</fieldset>
-						<fieldset class="prefs">
+						<fieldset>
 							<label>App Token:</label>
 							{$appTokenInputTag}
 						</fieldset>
-						<fieldset class="prefs">
+						<fieldset>
 						<label>Message Priority:</label>
 							{$priorityInputTag}
 						</fieldset>
@@ -240,10 +240,7 @@ class gotify_notifications extends Plugin {
 		$app_tokens = $this->get_stored_array('app_tokens');
 		$feed_id = $article['feed']['id'];
 
-		$server = $this->host->get($this, 'server');
-		$token = $this->host->get($this, 'app_token');
-		$priority = (int) $this->host->get($this, 'priority');
-
+		$token = $this->token;
 		if (array_key_exists($feed_id, $app_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
 			$token = $app_tokens[$feed_id];
@@ -252,11 +249,11 @@ class gotify_notifications extends Plugin {
 		$feed_id = $article['feed']['id'];
 
 		try {
-			if ($server === false) {
+			if ($this->server === false) {
 				throw new Exception('No Gotify server URL set.');
 			}
 
-			if ($token === false) {
+			if ($this->token === false) {
 				throw new Exception('No Gotify app token set.');
 			}
 
@@ -264,9 +261,9 @@ class gotify_notifications extends Plugin {
 				Feeds::_get_title($feed_id),
 				$article['title'],
 				$article['link'],
-				$server,
+				$this->server,
 				$token,
-				$priority
+				$this->priority
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
@@ -279,21 +276,18 @@ class gotify_notifications extends Plugin {
 		$app_tokens = $this->get_stored_array('app_tokens');
 		$feed_id = $article['feed']['id'];
 
-		$server = $this->host->get($this, 'server');
-		$token = $this->host->get($this, 'app_token');
-		$priority = (int) $this->host->get($this, 'priority');
-
+		$token = $this->token;
 		if (array_key_exists($feed_id, $app_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
 			$token = $app_tokens[$feed_id];
 		}
 
 		try {
-			if ($server === false) {
+			if ($this->server === false) {
 				throw new Exception('No Gotify server URL set.');
 			}
 
-			if ($token === false) {
+			if ($this->token === false) {
 				throw new Exception('No Gotify app token set.');
 			}
 
@@ -317,9 +311,9 @@ class gotify_notifications extends Plugin {
 				Feeds::_get_title($feed_id),
 				$article['title'],
 				$article['link'],
-				$server,
+				$this->server,
 				$token,
-				$priority
+				$this->priority
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
@@ -357,11 +351,10 @@ class gotify_notifications extends Plugin {
 			$payload = [
 				'title' => $title,
 				'message' => $body,
-				'priority' => $priority
+				'priority' => (int) $priority
 			];
 
 			if ($url !== null) {
-				$payload['extras'][] = [
 				$payload['extras'] = [
 					'client::notification' => [
 						'click' => ['url' => $url]
