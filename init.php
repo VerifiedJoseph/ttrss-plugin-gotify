@@ -13,6 +13,9 @@ class gotify_notifications extends Plugin {
 	private string $token;
 	private string $priority;
 
+	private array $enabled_feeds;
+	private array $feed_app_tokens;
+
 	function about() {
 		return array(
 			'1.3',
@@ -37,6 +40,9 @@ class gotify_notifications extends Plugin {
 		$this->server = $this->host->get($this, 'server');
 		$this->token = $this->host->get($this, 'app_token');
 		$this->priority = $this->host->get($this, 'priority');
+
+		$this->enabled_feeds = $this->get_stored_array('enabled_feeds');
+		$this->feed_app_tokens = $this->get_stored_array('app_tokens');
 	}
 
 	function save()
@@ -100,15 +106,13 @@ class gotify_notifications extends Plugin {
 		$priorityInputTag = \Controls\number_spinner_tag('priority', $this->priority, ['required' => 1]);
 		$submitTag = \Controls\submit_tag(__('Save'));
 
-		$enabledFeeds = $this->filter_unknown_feeds(
-			$this->get_stored_array('enabled_feeds')
-		);
+		$this->enabled_feeds = $this->filter_unknown_feeds($this->enabled_feeds);
 
-		$this->host->set($this, 'enabled_feeds', $enabledFeeds);
+		$this->host->set($this, 'enabled_feeds', $this->enabled_feeds);
 
 		$feedList = '';
-		if (count($enabledFeeds) > 0) {
-			$feedList = $this->getFeedList($enabledFeeds);
+		if (count($this->enabled_feeds) > 0) {
+			$feedList = $this->getFeedList($this->enabled_feeds);
 		}
 
 		print <<<HTML
@@ -168,7 +172,6 @@ class gotify_notifications extends Plugin {
 
 	function hook_prefs_edit_feed($feed_id)
 	{
-		$enabled_feeds = $this->get_stored_array('enabled_feeds');
 		$app_tokens = $this->get_stored_array('app_tokens');
 
 		$token = '';
@@ -176,7 +179,7 @@ class gotify_notifications extends Plugin {
 			$token = $app_tokens[$feed_id];
 		}
 
-		$checkboxTag = \Controls\checkbox_tag('gotify_enabled', in_array($feed_id, $enabled_feeds));
+		$checkboxTag = \Controls\checkbox_tag('gotify_enabled', in_array($feed_id, $this->enabled_feeds));
 		$tokenInputTag =  \Controls\input_tag(
 			'gotify_token', htmlspecialchars($token), 'text', array('dojoType' => 'dijit.form.ValidationTextBox')
 		);
@@ -198,25 +201,24 @@ class gotify_notifications extends Plugin {
 
 	function hook_prefs_save_feed($feed_id)
 	{
-		$enabled_feeds = $this->get_stored_array('enabled_feeds');
 		$app_tokens = $this->get_stored_array('app_tokens');
 
-		$enable_key = array_search($feed_id, $enabled_feeds);
+		$enable_key = array_search($feed_id, $this->enabled_feeds);
 
 		$enable = checkbox_to_sql_bool($_POST['gotify_enabled'] ?? '');
 		$token = $_POST['gotify_token'] ?? '';
 
 		if ($enable) {
 			if ($enable_key === false) {
-				array_push($enabled_feeds, $feed_id);
+				array_push($this->enabled_feeds, $feed_id);
 			}
 		} else {
 			if ($enable_key !== false) {
-				unset($enabled_feeds[$enable_key]);
+				unset($this->enabled_feeds[$enable_key]);
 			}
 		}
 
-		$this->host->set($this, 'enabled_feeds', $enabled_feeds);
+		$this->host->set($this, 'enabled_feeds', $this->enabled_feeds);
 
 		if ($token !== '') {
 			$app_tokens[$feed_id] = $token;
@@ -272,7 +274,6 @@ class gotify_notifications extends Plugin {
 
 	function hook_filter_triggered($feed_id, $owner_uid, $article, $matched_filters, $matched_rules, $article_filters)
 	{
-		$enabled_feeds = $this->get_stored_array('enabled_feeds');
 		$app_tokens = $this->get_stored_array('app_tokens');
 		$feed_id = $article['feed']['id'];
 
@@ -291,7 +292,7 @@ class gotify_notifications extends Plugin {
 				throw new Exception('No Gotify app token set.');
 			}
 
-			if (in_array($feed_id, $enabled_feeds) === false) {
+			if (in_array($feed_id, $this->enabled_feeds) === false) {
 				throw new Exception('Gotify not enabled for this feed.');
 			}
 
