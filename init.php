@@ -14,7 +14,7 @@ class gotify_notifications extends Plugin {
 	private string $priority;
 
 	private array $enabled_feeds;
-	private array $feed_app_tokens;
+	private array $app_tokens;
 
 	function about() {
 		return array(
@@ -42,7 +42,7 @@ class gotify_notifications extends Plugin {
 		$this->priority = $this->host->get($this, 'priority');
 
 		$this->enabled_feeds = $this->get_stored_array('enabled_feeds');
-		$this->feed_app_tokens = $this->get_stored_array('app_tokens');
+		$this->app_tokens = $this->get_stored_array('app_tokens');
 	}
 
 	function save()
@@ -172,11 +172,9 @@ class gotify_notifications extends Plugin {
 
 	function hook_prefs_edit_feed($feed_id)
 	{
-		$app_tokens = $this->get_stored_array('app_tokens');
-
 		$token = '';
-		if (array_key_exists($feed_id, $app_tokens) === true) {
-			$token = $app_tokens[$feed_id];
+		if (array_key_exists($feed_id, $this->app_tokens) === true) {
+			$token = $this->app_tokens[$feed_id];
 		}
 
 		$checkboxTag = \Controls\checkbox_tag('gotify_enabled', in_array($feed_id, $this->enabled_feeds));
@@ -201,8 +199,6 @@ class gotify_notifications extends Plugin {
 
 	function hook_prefs_save_feed($feed_id)
 	{
-		$app_tokens = $this->get_stored_array('app_tokens');
-
 		$enable_key = array_search($feed_id, $this->enabled_feeds);
 
 		$enable = checkbox_to_sql_bool($_POST['gotify_enabled'] ?? '');
@@ -221,12 +217,12 @@ class gotify_notifications extends Plugin {
 		$this->host->set($this, 'enabled_feeds', $this->enabled_feeds);
 
 		if ($token !== '') {
-			$app_tokens[$feed_id] = $token;
-		} else if ($token === '' && array_key_exists($feed_id, $app_tokens)) {
-			unset($app_tokens[$feed_id]);
+			$this->app_tokens[$feed_id] = $token;
+		} else if ($token === '' && array_key_exists($feed_id, $this->app_tokens)) {
+			unset($this->app_tokens[$feed_id]);
 		}
 
-		$this->host->set($this, 'app_tokens', $app_tokens);
+		$this->host->set($this, 'app_tokens', $this->app_tokens);
 	}
 
 	private function get_stored_array($name)
@@ -239,13 +235,12 @@ class gotify_notifications extends Plugin {
 	}
 
     public function hook_article_filter_action($article, $action) {
-		$app_tokens = $this->get_stored_array('app_tokens');
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
-		if (array_key_exists($feed_id, $app_tokens) === true) {
+		if (array_key_exists($feed_id, $this->app_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
-			$token = $app_tokens[$feed_id];
+			$token = $this->app_tokens[$feed_id];
 		}
 
 		$feed_id = $article['feed']['id'];
@@ -274,13 +269,12 @@ class gotify_notifications extends Plugin {
 
 	function hook_filter_triggered($feed_id, $owner_uid, $article, $matched_filters, $matched_rules, $article_filters)
 	{
-		$app_tokens = $this->get_stored_array('app_tokens');
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
-		if (array_key_exists($feed_id, $app_tokens) === true) {
+		if (array_key_exists($feed_id, $this->app_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
-			$token = $app_tokens[$feed_id];
+			$token = $this->app_tokens[$feed_id];
 		}
 
 		try {
