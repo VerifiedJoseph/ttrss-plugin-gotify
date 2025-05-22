@@ -40,6 +40,36 @@ class gotify_notifications extends Plugin {
 		echo __('Data saved.');
 	}
 
+    public function test_notification()
+	{
+        $server = $_POST['server'];
+        $token = $_POST['app_token'];
+        $priority = (int) $_POST['priority'] ?? 4;
+
+		try {
+			if ($server === false) {
+				throw new Exception('No Gotify server URL set.');
+			}
+
+			if ($token === false) {
+				throw new Exception('No Gotify app token set.');
+			}
+
+			$this->sendMessage(
+				'Test Notification',
+				'Test notification from Tiny Tiny RSS',
+				null,
+				$server,
+				$token,
+				$priority
+			);
+
+			echo __("Test notification sent");
+		} catch (Exception $err) {
+			echo __($err->getMessage());
+		}
+    }
+
 	function hook_prefs_tab($args)
 	{
 		if ($args != 'prefFeeds') {
@@ -84,7 +114,7 @@ class gotify_notifications extends Plugin {
 		print <<<HTML
 			<div dojoType="dijit.layout.AccordionPane" title="<i class='material-icons'>extension</i> Gotify settings">
 				{$notice}
-				<form dojoType="dijit.form.Form">
+				<form id="gotify" dojoType="dijit.form.Form">
 					{$pluginHandlerTags}
 					<script type="dojo/method" event="onSubmit" args="evt">
 						evt.preventDefault();
@@ -111,6 +141,25 @@ class gotify_notifications extends Plugin {
 					</section>
 					<hr/>
 					{$submitTag}
+					<button dojoType="dijit.form.Button">
+						Test
+						<script type="dojo/on" data-dojo-event="click" data-dojo-args="evt">
+							require(['dojo/dom-form'], function(domForm) {
+								Notify.progress('Sending test notification...', true);
+
+								var gotifyData = domForm.toObject('gotify')
+								gotifyData.method = "test_notification"
+
+								xhr.post("backend.php", gotifyData, reply => {
+									if (reply.errors) {
+										Notify.error(reply.errors.join('; '));
+									} else {
+										Notify.info(reply);
+									}
+								});
+							});
+						</script>
+					</button>
 				</form>
 				{$feedList}
 			</div>
@@ -293,7 +342,7 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-	private function sendMessage($feedName, $title, $url, $server, $token, $priority)
+	private function sendMessage($title, $body, $url, $server, $token, $priority)
 	{
 		Debug::log('[Gotify] Sending message via ' . $server, Debug::LOG_VERBOSE);
 
@@ -306,15 +355,18 @@ class gotify_notifications extends Plugin {
 			];
 
 			$payload = [
-				'title' => $feedName,
-				'message' => $title,
-				'priority' => $priority,
-				'extras' => [
+				'title' => $title,
+				'message' => $body,
+				'priority' => $priority
+			];
+
+			if ($url !== null) {
+				$payload['extras'][] = [
 					'client::notification' => [
 						'click' => ['url' => $url]
 					]
-				]
-			];
+				];
+			}
 
 			$request = new Request($this->useragent);
 			$response = $request->post(
