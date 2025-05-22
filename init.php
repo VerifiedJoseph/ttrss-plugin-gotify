@@ -362,6 +362,7 @@ class gotify_notifications extends Plugin {
 
 			if ($url !== null) {
 				$payload['extras'][] = [
+				$payload['extras'] = [
 					'client::notification' => [
 						'click' => ['url' => $url]
 					]
