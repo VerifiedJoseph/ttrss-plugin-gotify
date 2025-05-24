@@ -61,14 +61,6 @@ class gotify_notifications extends Plugin {
         $priority = (int) $_POST['priority'];
 
 		try {
-			if ($server === false) {
-				throw new Exception('No Gotify server URL set.');
-			}
-
-			if ($token === false) {
-				throw new Exception('No Gotify app token set.');
-			}
-
 			$this->sendMessage(
 				'Test Notification',
 				'Test notification from Tiny Tiny RSS',
@@ -80,6 +72,7 @@ class gotify_notifications extends Plugin {
 
 			echo __("Test notification sent");
 		} catch (Exception $err) {
+			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 			echo __($err->getMessage());
 		}
     }
@@ -246,14 +239,6 @@ class gotify_notifications extends Plugin {
 		$feed_id = $article['feed']['id'];
 
 		try {
-			if ($this->server === false) {
-				throw new Exception('No Gotify server URL set.');
-			}
-
-			if ($this->token === false) {
-				throw new Exception('No Gotify app token set.');
-			}
-
 			$this->sendMessage(
 				Feeds::_get_title($feed_id),
 				$article['title'],
@@ -264,6 +249,7 @@ class gotify_notifications extends Plugin {
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
+			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 		}
     }
 
@@ -278,14 +264,6 @@ class gotify_notifications extends Plugin {
 		}
 
 		try {
-			if ($this->server === false) {
-				throw new Exception('No Gotify server URL set.');
-			}
-
-			if ($this->token === false) {
-				throw new Exception('No Gotify app token set.');
-			}
-
 			if (in_array($feed_id, $this->enabled_feeds) === false) {
 				throw new Exception('Gotify not enabled for this feed.');
 			}
@@ -312,6 +290,7 @@ class gotify_notifications extends Plugin {
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
+			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 		}
 	}
 
@@ -335,48 +314,51 @@ class gotify_notifications extends Plugin {
 	{
 		Debug::log('[Gotify] Sending message via ' . $server, Debug::LOG_VERBOSE);
 
-		try {
-			$server = $this->validateServerUrl($server);
-
-			$headers = [
-				'content-type' => 'application/json; charset=utf-8',
-				'x-gotify-key' => $token
-			];
-
-			$payload = [
-				'title' => $title,
-				'message' => $body,
-				'priority' => (int) $priority
-			];
-
-			if ($url !== null) {
-				$payload['extras'] = [
-					'client::notification' => [
-						'click' => ['url' => $url]
-					]
-				];
-			}
-
-			$request = new Request($this->useragent);
-			$response = $request->post(
-				$server . 'message',
-				$payload,
-				$headers
-			);
-
-			if ($response['statusCode'] !== 200) {
-				throw new Exception(sprintf(
-					'Sending message failed. Status code: %s Body: %s',
-					$response['statusCode'],
-					$response['body'
-				]));
-			}
-
-			Logger::log(E_USER_NOTICE, 'Gotify: Sent message.');
-		} catch (Exception $err) {
-			Debug::log('[Gotify] ' . $err->getMessage());
-			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
+		if ($server === false) {
+			throw new Exception('No Gotify server URL set.');
 		}
+
+		if ($token === false) {
+			throw new Exception('No Gotify app token set.');
+		}
+
+		$server = $this->validateServerUrl($server);
+
+		$headers = [
+			'content-type' => 'application/json; charset=utf-8',
+			'x-gotify-key' => $token
+		];
+
+		$payload = [
+			'title' => $title,
+			'message' => $body,
+			'priority' => (int) $priority
+		];
+
+		if ($url !== null) {
+			$payload['extras'] = [
+				'client::notification' => [
+					'click' => ['url' => $url]
+				]
+			];
+		}
+
+		$request = new Request($this->useragent);
+		$response = $request->post(
+			$server . 'message',
+			$payload,
+			$headers
+		);
+
+		if ($response['statusCode'] !== 200) {
+			throw new Exception(sprintf(
+				'Sending message failed. Status code: %s Body: %s',
+				$response['statusCode'],
+				$response['body'
+			]));
+		}
+
+		Logger::log(E_USER_NOTICE, 'Gotify: Sent message.');
 	}
 
 	private function isNewArticle($guid)
@@ -423,7 +405,7 @@ class gotify_notifications extends Plugin {
 		}
 
 		if (substr($server, -1) !== '/') {
-			$url .= '/';
+			$server .= '/';
 		}
 
 		return $server;
