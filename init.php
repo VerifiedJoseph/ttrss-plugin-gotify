@@ -72,7 +72,6 @@ class gotify_notifications extends Plugin {
 
 			echo __("Test notification sent");
 		} catch (Exception $err) {
-			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 			echo __($err->getMessage());
 		}
     }
@@ -249,7 +248,6 @@ class gotify_notifications extends Plugin {
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
-			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 		}
     }
 
@@ -290,7 +288,6 @@ class gotify_notifications extends Plugin {
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
-			Logger::log(E_USER_ERROR, 'Gotify error: ' . $err->getMessage());
 		}
 	}
 
@@ -351,11 +348,14 @@ class gotify_notifications extends Plugin {
 		);
 
 		if ($response['statusCode'] !== 200) {
-			throw new Exception(sprintf(
+			$message = sprintf(
 				'Sending message failed. Status code: %s Body: %s',
 				$response['statusCode'],
 				$response['body'
-			]));
+			]);
+
+			Logger::log(E_USER_ERROR, 'Gotify error: ' . $message);
+			throw new Exception($message);
 		}
 
 		Logger::log(E_USER_NOTICE, 'Gotify: Sent message.');
@@ -401,7 +401,10 @@ class gotify_notifications extends Plugin {
 	private function validateServerUrl(string $server): string
 	{
 		if (preg_match('/^https?:\/\//', $server) === 0) {
-			throw new Exception('Gotify server must start with https:// or http://');
+			$message = 'Gotify server must start with https:// or http://';
+			Logger::log(E_USER_ERROR, 'Gotify error: ' . $message);
+
+			throw new Exception($message);
 		}
 
 		if (substr($server, -1) !== '/') {
