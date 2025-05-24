@@ -358,7 +358,10 @@ class gotify_notifications extends Plugin {
 			throw new Exception($message);
 		}
 
-		Logger::log(E_USER_NOTICE, 'Gotify: Sent message.');
+		Logger::log(E_USER_NOTICE, sprintf(
+			"Gotify: Sent message for %s",
+			$body
+		));
 	}
 
 	private function isNewArticle($guid)
