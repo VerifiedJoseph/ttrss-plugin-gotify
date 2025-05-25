@@ -266,12 +266,12 @@ class gotify_notifications extends Plugin {
 				throw new Exception('Gotify not enabled for this feed.');
 			}
 
-			if (RSSUtils::find_article_filter($article_filters, 'filter') !== null) {
+			if ($this->has_article_filter_action($article_filters, 'filter') === true) {
 				throw new Exception('Article deleted via filter. Not sending message.');
 			}
 
-			if (RSSUtils::find_article_filter($article_filters, 'catchup') !== null) {
-				throw new Exception('Article mark as read via filter. Not sending message.');
+			if ($this->has_article_filter_action($article_filters, 'catchup') === true) {
+				throw new Exception('Article marked as read via filter. Not sending message.');
 			}
 
 			if ($this->isNewArticle($article['guid_hashed']) === false) {
@@ -289,6 +289,18 @@ class gotify_notifications extends Plugin {
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
 		}
+	}
+
+	// Copy of RSSUtils::has_article_filter_action()
+	private function has_article_filter_action(array $filter_actions, string $filter_action_type)
+	{
+		foreach ($filter_actions as $fa) {
+			if ($fa["type"] == $filter_action_type) {
+				return true;
+			};
+		}
+
+		return false;
 	}
 
 	private function filter_unknown_feeds($enabled_feeds)
