@@ -7,7 +7,7 @@ class gotify_notifications extends Plugin {
 	/* @var PluginHost $host */
 	private $host;
 
-	private string $useragent = 'Tiny Tiny RSS Gotify plugin (https://github.com/VerifiedJoseph/ttrss-plugin-gotify)';
+	private string $useragent = 'Tiny Tiny RSS/gotify-plugin (https://github.com/VerifiedJoseph/ttrss-plugin-gotify)';
 
 	private string $server;
 	private string $token;
