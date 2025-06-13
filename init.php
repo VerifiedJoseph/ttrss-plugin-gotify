@@ -16,6 +16,13 @@ class gotify_notifications extends Plugin {
 	private array $enabled_feeds;
 	private array $app_tokens;
 
+	private $priorityLevels = [
+		'minimum' => 0,
+		'low' => 1,
+		'default' => 4,
+		'high' => 8
+	];
+
 	function about() {
 		return array(
 			'1.3',
@@ -49,7 +56,7 @@ class gotify_notifications extends Plugin {
 	{
 		$this->host->set($this, 'server', $_POST['server']);
 		$this->host->set($this, 'app_token', $_POST['app_token']);
-		$this->host->set($this, 'priority', $_POST['priority']);
+		$this->host->set($this, 'priority', $this->getPriorityLevel($_POST['priority']));
 
 		echo __('Data saved.');
 	}
@@ -58,12 +65,20 @@ class gotify_notifications extends Plugin {
 	{
         $server = $_POST['server'];
         $token = $_POST['app_token'];
-        $priority = (int) $_POST['priority'];
+		$priority = $this->getPriorityLevel($_POST['priority']);
+		
+		$levels = array_flip($this->priorityLevels);
+
+		$body = sprintf(
+			'Test notification from Tiny Tiny RSS with %s priority (level %s)',
+			$levels[$priority],
+			$priority
+		);
 
 		try {
 			$this->sendMessage(
 				'Test Notification',
-				'Test notification from Tiny Tiny RSS',
+				$body,
 				null,
 				$server,
 				$token,
@@ -95,7 +110,12 @@ class gotify_notifications extends Plugin {
 			'app_token', htmlspecialchars($this->token), 'text', $attributes
 		);
 
-		$priorityInputTag = \Controls\number_spinner_tag('priority', $this->priority, ['required' => 1]);
+		$priorityInputTag = \Controls\select_tag(
+			'priority',
+			$this->priorityLevels[$this->priority],
+			array_keys($this->priorityLevels)
+		);
+		
 		$submitTag = \Controls\submit_tag(__('Save'));
 
 		$this->enabled_feeds = $this->filter_unknown_feeds($this->enabled_feeds);
@@ -411,6 +431,17 @@ class gotify_notifications extends Plugin {
 				{$list}
 			</ul>
 		HTML;
+	}
+
+	private function getPriorityLevel($word)
+	{
+		$default = 4; // default priority level
+
+		if (array_key_exists($word , $this->priorityLevels) === true) {
+			return $this->priorityLevels[$word];
+		}
+
+		return $default;
 	}
 
 	private function validateServerUrl(string $server): string
