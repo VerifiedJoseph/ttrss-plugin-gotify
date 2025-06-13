@@ -3,7 +3,6 @@
 require_once __DIR__ . "/include/Request.php";
 
 class gotify_notifications extends Plugin {
-
 	/* @var PluginHost $host */
 	private $host;
 
@@ -15,6 +14,7 @@ class gotify_notifications extends Plugin {
 
 	private array $enabled_feeds;
 	private array $feed_tokens;
+	private array $feed_priorities;
 
 	private $priorityLevels = [
 		'minimum' => 0,
@@ -25,7 +25,7 @@ class gotify_notifications extends Plugin {
 
 	function about() {
 		return array(
-			'1.3',
+			'1.4',
 			'Send push notifications with Gotify on new feed items',
 			'VerifiedJoseph');
 	}
@@ -50,6 +50,7 @@ class gotify_notifications extends Plugin {
 
 		$this->enabled_feeds = $this->get_stored_array('enabled_feeds');
 		$this->feed_tokens = $this->get_stored_array('app_tokens');
+		$this->feed_priorities = $this->get_stored_array('feed_priorities');
 	}
 
 	function save()
@@ -184,8 +185,14 @@ class gotify_notifications extends Plugin {
 	function hook_prefs_edit_feed($feed_id)
 	{
 		$token = '';
+		$priority = 4;
+
 		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
 			$token = $this->feed_tokens[$feed_id];
+		}
+
+		if (array_key_exists($feed_id, $this->feed_priorities) === true) {
+			$priority = (int) $this->feed_priorities[$feed_id];
 		}
 
 		$checkboxTag = \Controls\checkbox_tag('gotify_enabled', in_array($feed_id, $this->enabled_feeds));
@@ -193,16 +200,26 @@ class gotify_notifications extends Plugin {
 			'gotify_token', htmlspecialchars($token), 'text', array('dojoType' => 'dijit.form.ValidationTextBox')
 		);
 
+		$priorityInputTag = \Controls\select_tag(
+			'gotify_priority',
+			$this->getPriorityLevelName($priority),
+			array_keys($this->priorityLevels)
+		);
+
 		print <<<HTML
 			<header>Gotify Notifications</header>
 			<section>
 				<fieldset>
-				<label>Enable:</label>
+					<label>Enable:</label>
 					{$checkboxTag}
 				</fieldset>
 				<fieldset>
-				<label>App token:</label>
+					<label>App token:</label>
 					{$tokenInputTag} <span title="Set app token specifically for this feed.">[?]</span>
+				</fieldset>
+				<fieldset>
+					<label>Priority:</label>
+					{$priorityInputTag} <span title="Set priority level specifically for this feed.">[?]</span>
 				</fieldset>
 			</section>
 		HTML;
@@ -212,10 +229,11 @@ class gotify_notifications extends Plugin {
 	{
 		$enable_key = array_search($feed_id, $this->enabled_feeds);
 
-		$enable = checkbox_to_sql_bool($_POST['gotify_enabled'] ?? '');
+		$enabled = checkbox_to_sql_bool($_POST['gotify_enabled'] ?? '');
 		$token = $_POST['gotify_token'] ?? '';
+		$priority = $_POST['gotify_priority'] ?? '';
 
-		if ($enable) {
+		if ($enabled) {
 			if ($enable_key === false) {
 				array_push($this->enabled_feeds, $feed_id);
 			}
@@ -225,15 +243,21 @@ class gotify_notifications extends Plugin {
 			}
 		}
 
-		$this->host->set($this, 'enabled_feeds', $this->enabled_feeds);
-
 		if ($token !== '') {
 			$this->feed_tokens[$feed_id] = $token;
 		} else if ($token === '' && array_key_exists($feed_id, $this->feed_tokens)) {
 			unset($this->feed_tokens[$feed_id]);
 		}
 
+		if ($priority !== '') {
+			$this->feed_priorities[$feed_id] = $this->getPriorityLevel($priority);
+		} else if ($priority === '' && array_key_exists($feed_id, $this->feed_priorities)) {
+			unset($this->feed_priorities[$feed_id]);
+		}
+
+		$this->host->set($this, 'enabled_feeds', $this->enabled_feeds);
 		$this->host->set($this, 'app_tokens', $this->feed_tokens);
+		$this->host->set($this, 'feed_priorities', $this->feed_priorities);
 	}
 
 	private function get_stored_array($name)
@@ -249,12 +273,17 @@ class gotify_notifications extends Plugin {
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
+		$priority = $this->priority;
+
 		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
 			$token = $this->feed_tokens[$feed_id];
 		}
 
-		$feed_id = $article['feed']['id'];
+		if (array_key_exists($feed_id, $this->feed_priorities) === true) {
+			Debug::log('[Gotify] Using feed specific priority level');
+			$priority = $this->feed_priorities[$feed_id];
+		}
 
 		try {
 			$this->sendMessage(
@@ -263,7 +292,7 @@ class gotify_notifications extends Plugin {
 				$article['link'],
 				$this->server,
 				$token,
-				$this->priority
+				$priority
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
@@ -275,10 +304,7 @@ class gotify_notifications extends Plugin {
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
-		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
-			Debug::log('[Gotify] Using feed specific app token');
-			$token = $this->feed_tokens[$feed_id];
-		}
+		$priority = $this->priority;
 
 		try {
 			if (in_array($feed_id, $this->enabled_feeds) === false) {
@@ -297,13 +323,23 @@ class gotify_notifications extends Plugin {
 				throw new Exception('Article is not new. Not sending message');
 			}
 
+			if (array_key_exists($feed_id, $this->feed_tokens) === true) {
+				Debug::log('[Gotify] Using feed specific app token');
+				$token = $this->feed_tokens[$feed_id];
+			}
+
+			if (array_key_exists($feed_id, $this->feed_priorities) === true) {
+				Debug::log('[Gotify] Using feed specific priority level');
+				$priority = $this->feed_priorities[$feed_id];
+			}
+
 			$this->sendMessage(
 				Feeds::_get_title($feed_id),
 				$article['title'],
 				$article['link'],
 				$this->server,
 				$token,
-				$this->priority
+				$priority
 			);
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
