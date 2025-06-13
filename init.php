@@ -19,7 +19,7 @@ class gotify_notifications extends Plugin {
 	private $priorityLevels = [
 		'minimum' => 0,
 		'low' => 1,
-		'default' => 4,
+		'normal' => 4,
 		'high' => 8
 	];
 
