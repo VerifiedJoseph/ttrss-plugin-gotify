@@ -14,7 +14,7 @@ class gotify_notifications extends Plugin {
 	private string $priority;
 
 	private array $enabled_feeds;
-	private array $app_tokens;
+	private array $feed_tokens;
 
 	private $priorityLevels = [
 		'minimum' => 0,
@@ -49,7 +49,7 @@ class gotify_notifications extends Plugin {
 		$this->priority = $this->host->get($this, 'priority');
 
 		$this->enabled_feeds = $this->get_stored_array('enabled_feeds');
-		$this->app_tokens = $this->get_stored_array('app_tokens');
+		$this->feed_tokens = $this->get_stored_array('app_tokens');
 	}
 
 	function save()
@@ -185,8 +185,8 @@ class gotify_notifications extends Plugin {
 	function hook_prefs_edit_feed($feed_id)
 	{
 		$token = '';
-		if (array_key_exists($feed_id, $this->app_tokens) === true) {
-			$token = $this->app_tokens[$feed_id];
+		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
+			$token = $this->feed_tokens[$feed_id];
 		}
 
 		$checkboxTag = \Controls\checkbox_tag('gotify_enabled', in_array($feed_id, $this->enabled_feeds));
@@ -229,12 +229,12 @@ class gotify_notifications extends Plugin {
 		$this->host->set($this, 'enabled_feeds', $this->enabled_feeds);
 
 		if ($token !== '') {
-			$this->app_tokens[$feed_id] = $token;
-		} else if ($token === '' && array_key_exists($feed_id, $this->app_tokens)) {
-			unset($this->app_tokens[$feed_id]);
+			$this->feed_tokens[$feed_id] = $token;
+		} else if ($token === '' && array_key_exists($feed_id, $this->feed_tokens)) {
+			unset($this->feed_tokens[$feed_id]);
 		}
 
-		$this->host->set($this, 'app_tokens', $this->app_tokens);
+		$this->host->set($this, 'app_tokens', $this->feed_tokens);
 	}
 
 	private function get_stored_array($name)
@@ -250,9 +250,9 @@ class gotify_notifications extends Plugin {
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
-		if (array_key_exists($feed_id, $this->app_tokens) === true) {
+		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
-			$token = $this->app_tokens[$feed_id];
+			$token = $this->feed_tokens[$feed_id];
 		}
 
 		$feed_id = $article['feed']['id'];
@@ -276,9 +276,9 @@ class gotify_notifications extends Plugin {
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
-		if (array_key_exists($feed_id, $this->app_tokens) === true) {
+		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
 			Debug::log('[Gotify] Using feed specific app token');
-			$token = $this->app_tokens[$feed_id];
+			$token = $this->feed_tokens[$feed_id];
 		}
 
 		try {
