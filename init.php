@@ -66,12 +66,11 @@ class gotify_notifications extends Plugin {
         $server = $_POST['server'];
         $token = $_POST['app_token'];
 		$priority = $this->getPriorityLevel($_POST['priority']);
-		
-		$levels = array_flip($this->priorityLevels);
+		$priorityName = $this->getPriorityLevelName($this->priority);
 
 		$body = sprintf(
 			'Test notification from Tiny Tiny RSS with %s priority (level %s)',
-			$levels[$priority],
+			$priorityName,
 			$priority
 		);
 
@@ -112,7 +111,7 @@ class gotify_notifications extends Plugin {
 
 		$priorityInputTag = \Controls\select_tag(
 			'priority',
-			$this->priorityLevels[$this->priority],
+			$this->getPriorityLevelName($this->priority),
 			array_keys($this->priorityLevels)
 		);
 		
@@ -433,15 +432,21 @@ class gotify_notifications extends Plugin {
 		HTML;
 	}
 
-	private function getPriorityLevel($word)
+	private function getPriorityLevel($name)
 	{
 		$default = 4; // default priority level
 
-		if (array_key_exists($word , $this->priorityLevels) === true) {
-			return $this->priorityLevels[$word];
+		if (array_key_exists($name, $this->priorityLevels) === true) {
+			return $this->priorityLevels[$name];
 		}
 
 		return $default;
+	}
+
+	private function getPriorityLevelName($number) 
+	{
+		$levels = array_flip($this->priorityLevels);
+		return $levels[$number];
 	}
 
 	private function validateServerUrl(string $server): string
