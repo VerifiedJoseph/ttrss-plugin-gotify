@@ -27,7 +27,10 @@ class gotify_notifications extends Plugin {
 		return array(
 			'1.4',
 			'Send push notifications with Gotify on new feed items',
-			'VerifiedJoseph');
+			'VerifiedJoseph',
+			false,
+			'https://github.com/VerifiedJoseph/ttrss-plugin-gotify'
+		);
 	}
 
 	function api_version()
