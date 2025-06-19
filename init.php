@@ -17,10 +17,11 @@ class gotify_notifications extends Plugin {
 	private array $feed_priorities;
 
 	private $priorityLevels = [
-		'minimum' => 0,
-		'low' => 1,
-		'normal' => 4,
-		'high' => 8
+		'-1' => 'Global default',
+		'0' => 'Minimum',
+		'1' => 'Low',
+		'4' => 'Normal',
+		'8' => 'High'
 	];
 
 	function about() {
@@ -60,21 +61,27 @@ class gotify_notifications extends Plugin {
 	{
 		$this->host->set($this, 'server', $_POST['server']);
 		$this->host->set($this, 'app_token', $_POST['app_token']);
-		$this->host->set($this, 'priority', $this->getPriorityLevel($_POST['priority']));
+		$this->host->set($this, 'priority', $_POST['priority']);
 
 		echo __('Data saved.');
 	}
 
-    public function test_notification()
+	public function test_notification()
 	{
-        $server = $_POST['server'];
-        $token = $_POST['app_token'];
-		$priority = $this->getPriorityLevel($_POST['priority']);
-		$priorityName = $this->getPriorityLevelName($this->priority);
+		$server = $_POST['server'];
+		$token = $_POST['app_token'];
+
+		$priority = 4;
+
+		if (array_key_exists((int) $_POST['priority'], $this->priorityLevels) === true) {
+			$priority = (int) $_POST['priority'];
+		}
+
+		$priorityName = $this->priorityLevels[$priority];
 
 		$body = sprintf(
 			'Test notification from Tiny Tiny RSS with %s priority (level %s)',
-			$priorityName,
+			strtolower($priorityName),
 			$priority
 		);
 
@@ -92,7 +99,7 @@ class gotify_notifications extends Plugin {
 		} catch (Exception $err) {
 			echo __($err->getMessage());
 		}
-    }
+	}
 
 	function hook_prefs_tab($args)
 	{
@@ -113,12 +120,15 @@ class gotify_notifications extends Plugin {
 			'app_token', htmlspecialchars($this->token), 'text', $attributes
 		);
 
-		$priorityInputTag = \Controls\select_tag(
+		$options = $this->priorityLevels;
+		unset($options[-1]);
+
+		$priorityInputTag = $this->select_tag(
 			'priority',
-			$this->getPriorityLevelName($this->priority),
-			array_keys($this->priorityLevels)
+			$this->priority,
+			$options
 		);
-		
+
 		$submitTag = \Controls\submit_tag(__('Save'));
 
 		$this->enabled_feeds = $this->filter_unknown_feeds($this->enabled_feeds);
@@ -188,7 +198,7 @@ class gotify_notifications extends Plugin {
 	function hook_prefs_edit_feed($feed_id)
 	{
 		$token = '';
-		$priority = 4;
+		$priority = -1;
 
 		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
 			$token = $this->feed_tokens[$feed_id];
@@ -203,10 +213,13 @@ class gotify_notifications extends Plugin {
 			'gotify_token', htmlspecialchars($token), 'text', array('dojoType' => 'dijit.form.ValidationTextBox')
 		);
 
-		$priorityInputTag = \Controls\select_tag(
+		$options = $this->priorityLevels;
+		$options[-1] = 'Global default (' . $this->priorityLevels[$this->priority] . ')';
+
+		$priorityInputTag = $this->select_tag(
 			'gotify_priority',
-			$this->getPriorityLevelName($priority),
-			array_keys($this->priorityLevels)
+			$priority,
+			$options
 		);
 
 		print <<<HTML
@@ -253,7 +266,11 @@ class gotify_notifications extends Plugin {
 		}
 
 		if ($priority !== '') {
-			$this->feed_priorities[$feed_id] = $this->getPriorityLevel($priority);
+			if (array_key_exists((int) $priority, $this->priorityLevels) === false) {
+				$this->feed_priorities[$feed_id] = '-1';
+			} else {
+				$this->feed_priorities[$feed_id] = $priority;
+			}
 		} else if ($priority === '' && array_key_exists($feed_id, $this->feed_priorities)) {
 			unset($this->feed_priorities[$feed_id]);
 		}
@@ -272,7 +289,7 @@ class gotify_notifications extends Plugin {
 		return $tmp;
 	}
 
-    public function hook_article_filter_action($article, $action) {
+	public function hook_article_filter_action($article, $action) {
 		$feed_id = $article['feed']['id'];
 
 		$token = $this->token;
@@ -300,7 +317,7 @@ class gotify_notifications extends Plugin {
 		} catch (Exception $err) {
 			Debug::log('[Gotify] ' . $err->getMessage());
 		}
-    }
+	}
 
 	function hook_filter_triggered($feed_id, $owner_uid, $article, $matched_filters, $matched_rules, $article_filters)
 	{
@@ -396,6 +413,10 @@ class gotify_notifications extends Plugin {
 			'x-gotify-key' => $token
 		];
 
+		if ($priority === '-1') {
+			$priority = $this->priority;
+		}
+
 		$payload = [
 			'title' => $title,
 			'message' => $body,
@@ -471,23 +492,6 @@ class gotify_notifications extends Plugin {
 		HTML;
 	}
 
-	private function getPriorityLevel($name)
-	{
-		$default = 4; // default priority level
-
-		if (array_key_exists($name, $this->priorityLevels) === true) {
-			return $this->priorityLevels[$name];
-		}
-
-		return $default;
-	}
-
-	private function getPriorityLevelName($number) 
-	{
-		$levels = array_flip($this->priorityLevels);
-		return $levels[$number];
-	}
-
 	private function validateServerUrl(string $server): string
 	{
 		if (preg_match('/^https?:\/\//', $server) === 0) {
@@ -503,4 +507,22 @@ class gotify_notifications extends Plugin {
 
 		return $server;
 	}
+
+	private function select_tag(string $name, mixed $selected, array $values): string {
+		$name = htmlspecialchars($name);
+		$options = '';
+
+		foreach ($values as $index => $value) {
+			$is_sel = ($index == $selected) ? "selected=\"selected\"" : "";
+			$value = htmlspecialchars($value);
+
+			$options .= <<<HTML
+				<option value="{$index}" $is_sel>{$value}</option>
+			HTML;
+		}
+
+		return <<<HTML
+			<select dojoType="fox.form.Select" name="{$name}">{$options}</select>
+		HTML;
+   }
 }
