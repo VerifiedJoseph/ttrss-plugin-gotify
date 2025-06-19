@@ -292,18 +292,8 @@ class gotify_notifications extends Plugin {
 	public function hook_article_filter_action($article, $action) {
 		$feed_id = $article['feed']['id'];
 
-		$token = $this->token;
-		$priority = $this->priority;
-
-		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
-			Debug::log('[Gotify] Using feed specific app token');
-			$token = $this->feed_tokens[$feed_id];
-		}
-
-		if (array_key_exists($feed_id, $this->feed_priorities) === true) {
-			Debug::log('[Gotify] Using feed specific priority level');
-			$priority = $this->feed_priorities[$feed_id];
-		}
+		$token = $this->getFeedToken($feed_id);
+		$priority = $this->getFeedPriority($feed_id);
 
 		try {
 			$this->sendMessage(
@@ -323,9 +313,6 @@ class gotify_notifications extends Plugin {
 	{
 		$feed_id = $article['feed']['id'];
 
-		$token = $this->token;
-		$priority = $this->priority;
-
 		try {
 			if (in_array($feed_id, $this->enabled_feeds) === false) {
 				throw new Exception('Gotify not enabled for this feed.');
@@ -343,15 +330,8 @@ class gotify_notifications extends Plugin {
 				throw new Exception('Article is not new. Not sending message');
 			}
 
-			if (array_key_exists($feed_id, $this->feed_tokens) === true) {
-				Debug::log('[Gotify] Using feed specific app token');
-				$token = $this->feed_tokens[$feed_id];
-			}
-
-			if (array_key_exists($feed_id, $this->feed_priorities) === true) {
-				Debug::log('[Gotify] Using feed specific priority level');
-				$priority = $this->feed_priorities[$feed_id];
-			}
+			$token = $this->getFeedToken($feed_id);
+			$priority = $this->getFeedPriority($feed_id);
 
 			$this->sendMessage(
 				Feeds::_get_title($feed_id),
@@ -492,6 +472,36 @@ class gotify_notifications extends Plugin {
 		HTML;
 	}
 
+	/**
+	 * Returns app token for a feed specific or global token as fallback
+	 * @param mixed $feed_id
+	 * @return string 
+	 */
+	private function getFeedToken($feed_id): string
+	{
+		if (array_key_exists($feed_id, $this->feed_tokens) === true) {
+			Debug::log('[Gotify] Using feed specific app token');
+			return $this->feed_tokens[$feed_id];
+		}
+
+		return $this->token;
+	}
+
+	/**
+	 * Returns priority for a feed specific or global priority as fallback
+	 * @param mixed $feed_id
+	 * @return string 
+	 */
+	private function getFeedPriority($feed_id): string
+	{
+		if (array_key_exists($feed_id, $this->feed_priorities) === true) {
+			Debug::log('[Gotify] Using feed specific priority level');
+			return $this->feed_priorities[$feed_id];
+		}
+
+		return $this->token;
+	}
+
 	private function validateServerUrl(string $server): string
 	{
 		if (preg_match('/^https?:\/\//', $server) === 0) {
@@ -524,5 +534,5 @@ class gotify_notifications extends Plugin {
 		return <<<HTML
 			<select dojoType="fox.form.Select" name="{$name}">{$options}</select>
 		HTML;
-   }
+	}
 }
