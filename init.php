@@ -218,7 +218,7 @@ class gotify_notifications extends Plugin {
 					{$tokenInputTag} <span title="Set app token specifically for this feed.">[?]</span>
 				</fieldset>
 				<fieldset>
-					<label>Priority:</label>
+					<label>Message priority:</label>
 					{$priorityInputTag} <span title="Set priority level specifically for this feed.">[?]</span>
 				</fieldset>
 			</section>
