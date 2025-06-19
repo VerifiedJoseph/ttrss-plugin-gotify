@@ -70,7 +70,6 @@ class gotify_notifications extends Plugin {
 	{
 		$server = $_POST['server'];
 		$token = $_POST['app_token'];
-
 		$priority = 4;
 
 		if (array_key_exists((int) $_POST['priority'], $this->priorityLevels) === true) {
@@ -473,7 +472,7 @@ class gotify_notifications extends Plugin {
 	}
 
 	/**
-	 * Returns app token for a feed specific or global token as fallback
+	 * Returns app token for a specific feed or global token as fallback
 	 * @param mixed $feed_id
 	 * @return string 
 	 */
@@ -488,7 +487,7 @@ class gotify_notifications extends Plugin {
 	}
 
 	/**
-	 * Returns priority for a feed specific or global priority as fallback
+	 * Returns priority for a specific feed or global priority as fallback
 	 * @param mixed $feed_id
 	 * @return string 
 	 */
@@ -518,6 +517,7 @@ class gotify_notifications extends Plugin {
 		return $server;
 	}
 
+	// Custom version of \Controls\select_tag()
 	private function select_tag(string $name, mixed $selected, array $values): string {
 		$name = htmlspecialchars($name);
 		$options = '';
