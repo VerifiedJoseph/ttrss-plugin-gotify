@@ -333,7 +333,7 @@ class gotify_notifications extends Plugin {
 			$priority = $this->getFeedPriority($feed_id);
 
 			$this->sendMessage(
-				Feeds::_get_title($feed_id),
+				Feeds::_get_title($feed_id, $owner_uid),
 				$article['title'],
 				$article['link'],
 				$this->server,
@@ -451,7 +451,7 @@ class gotify_notifications extends Plugin {
 		$list ='';
 
 		foreach ($feeds as $f) {
-			$title = Feeds::_get_title($f);
+			$title = Feeds::_get_title($f, $_SESSION['uid']);
 
 			$list .= <<<HTML
 				<li>
