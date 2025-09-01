@@ -294,9 +294,15 @@ class gotify_notifications extends Plugin {
 		$token = $this->getFeedToken($feed_id);
 		$priority = $this->getFeedPriority($feed_id);
 
+		// Use custom query instead of Feeds::_get_title 
+		// because a owner uid is not passed to hook_article_filter_action
+		$feed = ORM::for_table('ttrss_feeds')
+			->select('title')
+			->find_one($feed_id);
+
 		try {
 			$this->sendMessage(
-				Feeds::_get_title($feed_id),
+				$feed->title,
 				$article['title'],
 				$article['link'],
 				$this->server,
